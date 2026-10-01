@@ -1,0 +1,7 @@
+{% if has_prev or has_next %}
+<nav class="pager" aria-label="Pagination">
+  {% if has_prev %}<a href="{{ pager_base }}page={{ page - 1 }}" rel="prev">&larr; Previous</a>{% endif %}
+  <span>Page {{ page }}</span>
+  {% if has_next %}<a href="{{ pager_base }}page={{ page + 1 }}" rel="next">Next &rarr;</a>{% endif %}
+</nav>
+{% endif %}

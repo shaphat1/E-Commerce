@@ -1,0 +1,77 @@
+# Local/staging stack:  cp .env.example .env  &&  docker compose up --build
+# Add demo data (WIPES the database):  docker compose --profile demo run --rm seed
+#
+# This file has not been executed in the environment that produced it (no Docker daemon there);
+# the CI `docker` job runs it on every push. Treat your first `docker compose up` as its first test.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: maumart
+      POSTGRES_USER: maumart
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - maumart_pgdata:/var/lib/postgresql/data
+    # No published port: only the backend (same compose network) can reach the database.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maumart -d maumart"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: &backend_env
+      MAUMART_ENV: ${MAUMART_ENV:-development}
+      DATABASE_URL: postgresql://maumart:${POSTGRES_PASSWORD}@db:5432/maumart
+      MAUMART_ALLOWED_ORIGINS: ${MAUMART_ALLOWED_ORIGINS:-http://localhost:8551}
+      MAUMART_APP_URL: ${MAUMART_APP_URL:-http://localhost:8551}
+      MAUMART_NOTIFY_BACKEND: ${MAUMART_NOTIFY_BACKEND:-console}
+      MAUMART_SMTP_HOST: ${MAUMART_SMTP_HOST:-}
+      MAUMART_SMTP_PORT: ${MAUMART_SMTP_PORT:-587}
+      MAUMART_SMTP_USER: ${MAUMART_SMTP_USER:-}
+      MAUMART_SMTP_PASSWORD: ${MAUMART_SMTP_PASSWORD:-}
+      MAUMART_SMTP_FROM: ${MAUMART_SMTP_FROM:-no-reply@maumart.ng}
+      MAUMART_PAYMENT_MOCK: ${MAUMART_PAYMENT_MOCK:-true}
+      MAUMART_PAYSTACK_SECRET_KEY: ${MAUMART_PAYSTACK_SECRET_KEY:-}
+      MAUMART_PILOT_COD_ONLY: ${MAUMART_PILOT_COD_ONLY:-}
+      MAUMART_ENABLE_HSTS: ${MAUMART_ENABLE_HSTS:-}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      MAUMART_API_BASE: http://backend:8000
+    ports:
+      - "8551:8551"
+    restart: unless-stopped
+
+  # One-shot demo data loader. DESTRUCTIVE: drops and recreates every table.
+  seed:
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *backend_env
+      MAUMART_SEED_CONFIRM: "yes"
+    command: ["python", "seed.py"]
+
+volumes:
+  maumart_pgdata:

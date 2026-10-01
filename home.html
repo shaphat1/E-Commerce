@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}MAUMart -- MAU's Campus Marketplace{% endblock %}
+{% block content %}
+<h1>MAUMart</h1>
+<p>Buy and sell across MAU -- books, electronics, fashion, groceries, food, and services, all from the campus community.</p>
+
+<section aria-labelledby="categories-heading">
+  <h2 id="categories-heading">Browse by category</h2>
+  <ul class="category-grid">
+    {% for c in categories %}
+    <li><a href="/store/category/{{ c|urlencode }}">{{ c }}</a></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section aria-labelledby="trending-heading">
+  <h2 id="trending-heading">Trending now</h2>
+  {% if listings %}
+  <ul class="product-grid">
+    {% for l in listings %}
+    <li class="product-card">
+      <a href="/store/product/{{ l.id }}">
+        {% if l.photo_urls %}
+        <img src="{{ l.photo_urls[0] }}" alt="{{ l.title }}" loading="lazy" width="200" height="200">
+        {% endif %}
+        <h3>{{ l.title }}</h3>
+      </a>
+      <p class="vendor">{{ l.vendor_name }}</p>
+      <p class="price">&#8358;{{ "{:,.0f}".format(l.price) }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>No listings yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

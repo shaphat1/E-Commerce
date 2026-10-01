@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}MAUMart -- MAU's Campus Marketplace{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}Buy and sell books, electronics, fashion, food, and services with the Modibbo Adama University community.{% endblock %}">
+<link rel="canonical" href="{% block canonical %}{{ base_url }}/store/{% endblock %}">
+<meta property="og:title" content="{% block og_title %}MAUMart{% endblock %}">
+<meta property="og:description" content="{% block og_description %}MAU's campus marketplace{% endblock %}">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+{% block extra_head %}{% endblock %}
+<link rel="stylesheet" href="/static/storefront.css">
+</head>
+<body>
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<header>
+  <nav aria-label="Primary">
+    <a href="/store/" class="site-name">MAUMart</a>
+    <form action="/store/search" method="get" role="search">
+      <label for="q" class="sr-only">Search MAUMart</label>
+      <input type="search" id="q" name="q" placeholder="Search books, electronics, food..." value="{{ query or '' }}">
+      <button type="submit">Search</button>
+    </form>
+    <a href="{{ app_url }}" class="cta">Open the app to buy or sell</a>
+  </nav>
+</header>
+<main id="main-content">
+{% block content %}{% endblock %}
+</main>
+<footer>
+  <nav aria-label="Footer">
+    <a href="/TERMS_OF_SERVICE.md">Terms of Service</a>
+    <a href="/PRIVACY_POLICY.md">Privacy Policy</a>
+    <a href="/REFUND_POLICY.md">Refund &amp; Return Policy</a>
+    <a href="/VENDOR_AGREEMENT.md">Vendor Agreement</a>
+  </nav>
+  <p>&copy; MAUMart -- a coursework project for Modibbo Adama University, Yola.</p>
+</footer>
+</body>
+</html>

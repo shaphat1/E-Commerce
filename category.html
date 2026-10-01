@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ category }} on MAUMart{% endblock %}
+{% block meta_description %}Browse {{ category }} listings from MAU vendors on MAUMart.{% endblock %}
+{% block canonical %}{{ base_url }}/store/category/{{ category|urlencode }}{% endblock %}
+{% block content %}
+<nav aria-label="Breadcrumb"><a href="/store/">MAUMart</a> &rsaquo; {{ category }}</nav>
+<h1>{{ category }}</h1>
+
+{% if listings %}
+<ul class="product-grid">
+  {% for l in listings %}
+  <li class="product-card">
+    <a href="/store/product/{{ l.id }}">
+      {% if l.photo_urls %}
+      <img src="{{ l.photo_urls[0] }}" alt="{{ l.title }}" loading="lazy" width="200" height="200">
+      {% endif %}
+      <h2>{{ l.title }}</h2>
+    </a>
+    <p class="vendor">{{ l.vendor_name }}</p>
+    <p class="price">&#8358;{{ "{:,.0f}".format(l.price) }}</p>
+  </li>
+  {% endfor %}
+</ul>
+{% include "_pager.html" %}
+{% else %}
+<p>No listings in this category yet.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,163 @@
+# This workflow has not yet run on GitHub's runners (it was authored where Actions could not be
+# triggered). Every command below was run locally; the first push is its first real execution.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [sqlite, postgres]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: maumart
+          POSTGRES_USER: maumart
+          POSTGRES_PASSWORD: maumart_ci_pw
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U maumart"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: ${{ matrix.db == 'postgres' && 'postgresql://maumart:maumart_ci_pw@localhost:5432/maumart' || 'sqlite:///./maumart.db' }}
+      MAUMART_SEED_CONFIRM: "yes"
+      MAUMART_SERVER_LOG: /tmp/backend.log
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Dependency vulnerability scan
+        if: matrix.db == 'sqlite'
+        run: pip-audit -r requirements.txt
+
+      - name: Seed demo data and start the API
+        run: |
+          python seed.py
+          nohup uvicorn main:app --host 127.0.0.1 --port 8000 > "$MAUMART_SERVER_LOG" 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://127.0.0.1:8000/healthz && break; sleep 1; done
+          curl -sf http://127.0.0.1:8000/healthz
+
+      - name: Functional API suite (29 cases)
+        run: python tests/test_api.py
+
+      - name: Overselling race (exactly one buyer gets the last unit)
+        run: python tests/test_concurrency.py
+
+      - name: Storefront accessibility checks
+        run: python tests/test_accessibility.py
+
+      - name: Performance acceptance (5,000 orders)
+        env:
+          MAUMART_PERF_CONFIRM: "yes"
+          MAUMART_REC_BUDGET: "0.6"   # shared CI runners are slower than a dev machine
+        run: python tests/test_performance.py
+
+      - name: Rate limit (fresh server, exhausts the login bucket)
+        run: |
+          pkill -f "uvicorn main:app" || true
+          python seed.py
+          nohup uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/backend2.log 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://127.0.0.1:8000/healthz && break; sleep 1; done
+          python tests/test_rate_limit.py
+
+      - name: Webhook signature unit tests
+        run: python tests/test_payment_gateway.py
+
+      - name: Notification backend (local SMTP server)
+        run: python tests/test_notifications.py
+
+  self-contained-suites:
+    # These start their own servers and throwaway SQLite databases.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Live-gateway payment flow (Paystack stub)
+        run: python tests/test_payment_flow.py
+      - name: Hardening (prod config, multi-instance, XSS, lockout)
+        run: python tests/test_hardening.py
+
+  frontend-smoke:
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend + frontend dependencies
+        run: |
+          pip install -r backend/requirements.txt
+          pip install -r frontend/requirements.txt
+      - name: Start backend, run the frontend structural smoke test
+        env:
+          DATABASE_URL: sqlite:///./maumart.db
+        run: |
+          cd backend && python seed.py
+          nohup uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://127.0.0.1:8000/healthz && break; sleep 1; done
+          cd ../frontend && python smoke_test.py
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images and bring the stack up
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        run: |
+          cp .env.example .env
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci-only-password/' .env
+          docker compose build
+          docker compose up -d
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8000/healthz && ok=1 && break; sleep 2; done
+          [ "${ok:-0}" = 1 ] || { docker compose logs; exit 1; }
+          curl -sf http://127.0.0.1:8000/store/ > /dev/null
+          curl -sf http://127.0.0.1:8000/TERMS_OF_SERVICE.md > /dev/null
+          docker compose down -v

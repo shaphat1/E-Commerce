@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Search: {{ query }} | MAUMart{% endblock %}
+{% block content %}
+<h1>Search results for &ldquo;{{ query }}&rdquo;</h1>
+{% if listings %}
+<ul class="product-grid">
+  {% for l in listings %}
+  <li class="product-card">
+    <a href="/store/product/{{ l.id }}">
+      {% if l.photo_urls %}
+      <img src="{{ l.photo_urls[0] }}" alt="{{ l.title }}" loading="lazy" width="200" height="200">
+      {% endif %}
+      <h2>{{ l.title }}</h2>
+    </a>
+    <p class="vendor">{{ l.vendor_name }}</p>
+    <p class="price">&#8358;{{ "{:,.0f}".format(l.price) }}</p>
+  </li>
+  {% endfor %}
+</ul>
+{% include "_pager.html" %}
+{% else %}
+<p>No results for &ldquo;{{ query }}&rdquo;. <a href="/store/">Back to browsing</a>.</p>
+{% endif %}
+{% endblock %}

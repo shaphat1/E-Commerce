@@ -1,0 +1,5 @@
+# Test/CI tooling -- not installed in the production image.
+-r requirements.txt
+aiosmtpd>=1.4,<2
+pip-audit
+httpx2

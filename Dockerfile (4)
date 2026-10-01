@@ -1,0 +1,22 @@
+# Flet web client. Serves the Flutter web shell via `flet run --web`, the invocation verified in
+# development. Python runs on the server, so MAUMART_API_BASE is the address the CONTAINER uses
+# to reach the backend (e.g. http://backend:8000), not a browser URL.
+# For a hardened production front end, put TLS and a reverse proxy in front of this port.
+
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+COPY . .
+
+RUN useradd --create-home --shell /usr/sbin/nologin maumart && chown -R maumart:maumart /app
+USER maumart
+
+EXPOSE 8551
+
+CMD ["flet", "run", "main.py", "--web", "--host", "0.0.0.0", "--port", "8551"]

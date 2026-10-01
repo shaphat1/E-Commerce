@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ listing.title }} -- {{ listing.vendor_name }} | MAUMart{% endblock %}
+{% block meta_description %}{{ listing.description[:155] if listing.description else listing.title + " from " + listing.vendor_name + " on MAUMart." }}{% endblock %}
+{% block canonical %}{{ base_url }}/store/product/{{ listing.id }}{% endblock %}
+{% block og_title %}{{ listing.title }}{% endblock %}
+{% block og_description %}{{ listing.description[:200] if listing.description }}{% endblock %}
+{% block og_type %}product{% endblock %}
+{% block extra_head %}
+{% if listing.photo_urls %}<meta property="og:image" content="{{ listing.photo_urls[0] }}">{% endif %}
+<script type="application/ld+json">
+{{ jsonld|safe }}
+</script>
+{% endblock %}
+{% block content %}
+<nav aria-label="Breadcrumb"><a href="/store/">MAUMart</a> &rsaquo; <a href="/store/category/{{ listing.category|urlencode }}">{{ listing.category }}</a> &rsaquo; {{ listing.title }}</nav>
+
+<article>
+  <h1>{{ listing.title }}</h1>
+
+  {% if listing.photo_urls %}
+  <div class="product-photos">
+    {% for url in listing.photo_urls %}
+    <img src="{{ url }}" alt="{{ listing.title }} -- photo {{ loop.index }}" loading="lazy" width="300" height="300">
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="vendor">Sold by {{ listing.vendor_name }}
+    {% if avg_rating %}-- {{ avg_rating }}/5 ({{ review_count }} review{{ 's' if review_count != 1 }}){% endif %}
+  </p>
+  <p class="price">&#8358;{{ "{:,.0f}".format(listing.price) }}</p>
+  <p class="stock">{{ listing.quantity }} in stock</p>
+  <p class="description">{{ listing.description }}</p>
+
+  <a href="{{ app_url }}" class="cta">Open the MAUMart app to buy this</a>
+
+  {% if reviews %}
+  <section aria-labelledby="reviews-heading">
+    <h2 id="reviews-heading">Reviews</h2>
+    <ul>
+      {% for r in reviews %}
+      <li>{{ r.rating }}/5 -- {{ r.comment }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}
